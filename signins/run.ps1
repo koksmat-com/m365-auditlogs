@@ -1,9 +1,9 @@
 # Step 1: Get Access Token from ENV
-$tenantId       = $env:GRAPH_TENANT_ID
-$clientId       = $env:GRAPH_CLIENT_ID
-$clientSecret   = $env:GRAPH_CLIENT_SECRET
-$targetUpn      = $env:GRAPH_TARGET_UPN       # Email recipient + OneDrive owner
-$mailFromUpn    = $env:GRAPH_MAIL_FROM_UPN    # Sender mailbox
+$tenantId = $env:GRAPH_TENANT_ID
+$clientId = $env:GRAPH_CLIENT_ID
+$clientSecret = $env:GRAPH_CLIENT_SECRET
+$targetUpn = $env:GRAPH_TARGET_UPN       # Email recipient + OneDrive owner
+$mailFromUpn = $env:GRAPH_MAIL_FROM_UPN    # Sender mailbox
 
 if (-not ($tenantId -and $clientId -and $clientSecret -and $targetUpn -and $mailFromUpn)) {
     throw "Missing one or more required environment variables."
@@ -30,6 +30,10 @@ while ($url) {
 }
 
 $timestamp = (Get-Date).ToString("yyyy-MM-dd_HHmmss")
+
+if (-not $env:TEMP) {
+    $env:TEMP = [System.IO.Path]::GetTempPath()
+}
 $tempFolder = Join-Path $env:TEMP "audit_$timestamp"
 New-Item -ItemType Directory -Path $tempFolder -Force | Out-Null
 $signInFile = Join-Path $tempFolder "signins.json"
@@ -53,16 +57,16 @@ Write-Host "✅ Collected $($auditLogs.Count) audit logs for $firstUserId"
 # Step 5: Upload to OneDrive of $targetUpn
 $driveResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$targetUpn/drive/root/children" -Headers $headers
 $folderResponse = Invoke-RestMethod -Method POST -Uri "https://graph.microsoft.com/v1.0/users/$targetUpn/drive/root/children" -Headers $headers -Body (@{
-    name = $timestamp
-    folder = @{}
-    '@microsoft.graph.conflictBehavior' = 'rename'
-} | ConvertTo-Json -Depth 10) -ContentType "application/json"
+        name                                = $timestamp
+        folder                              = @{}
+        '@microsoft.graph.conflictBehavior' = 'rename'
+    } | ConvertTo-Json -Depth 10) -ContentType "application/json"
 
 $folderId = $folderResponse.id
 
 function Upload-To-OneDrive {
     param($filePath, $fileName)
-    $uploadUrl = "https://graph.microsoft.com/v1.0/users/$targetUpn/drive/items/$folderId:/$fileName:/content"
+    $uploadUrl = "https://graph.microsoft.com/v1.0/users/$targetUpn/drive/items/$($folderId):/$($fileName):/content"
     Invoke-RestMethod -Uri $uploadUrl -Method PUT -Headers $headers -InFile $filePath -ContentType "application/json"
     Write-Host "📤 Uploaded $fileName"
 }
@@ -78,9 +82,9 @@ OneDrive folder: $timestamp
 "@
 
 $mailPayload = @{
-    message = @{
-        subject = "📊 Office 365 Sign-in & Audit Summary"
-        body = @{
+    message         = @{
+        subject      = "📊 Office 365 Sign-in & Audit Summary"
+        body         = @{
             contentType = "Text"
             content     = $emailBody
         }
