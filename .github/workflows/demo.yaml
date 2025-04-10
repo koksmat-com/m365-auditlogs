@@ -1,0 +1,27 @@
+name: Demo
+
+# Trigger the workflow manually
+on:
+
+  workflow_dispatch: # Allows manual triggering
+    inputs:
+      hello:
+        description: "Hello"
+        required: true
+        default: "world"
+
+jobs:
+  run-scripts:
+    runs-on: ubuntu-latest
+    env:
+      WORKDIR: ${{ github.workspace }}
+      HELLO: ${{ github.event.inputs.hello }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Run Demo Script
+        run: pwsh ./_demo/run.ps1
+        shell: pwsh
+
